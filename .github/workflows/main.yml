@@ -1,4 +1,4 @@
-name: Lint
+name: Tests
 
 on:
   push:
@@ -26,3 +26,51 @@ jobs:
         with:
           version: latest
           args: --timeout 3m
+
+  tests:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        vaultVer: [ "1.12.2", "1.11.6" ]
+
+    services:
+      vault:
+        image: vault:${{ matrix.vaultVer }}
+        ports:
+          - 8200:8200
+        options: >-
+          --cap-add IPC_LOCK
+        env:
+          VAULT_DEV_ROOT_TOKEN_ID: testtoken
+          VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+          VAULT_LOG_LEVEL: trace
+
+    steps:
+      - id: go-cache-paths
+        run: |
+          echo "go-build=$(go env GOCACHE)" >> $GITHUB_OUTPUT
+          echo "go-mod=$(go env GOMODCACHE)" >> $GITHUB_OUTPUT
+
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: "1.x"
+
+      - name: Go Build Cache
+        uses: actions/cache@v3
+        with:
+          path: ${{ steps.go-cache-paths.outputs.go-build }}
+          key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
+
+      - name: Go Mod Cache
+        uses: actions/cache@v3
+        with:
+          path: ${{ steps.go-cache-paths.outputs.go-mod }}
+          key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
+
+      - name: Run tests
+        run: make test

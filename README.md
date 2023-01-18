@@ -1,4 +1,7 @@
 # k8s-vault-operator
+
+![Tests](https://github.com/kiwicom/k8s-vault-operator/actions/workflows/main.yml/badge.svg)
+
 Syncing vault secrets to k8s secrets.
 
 ## Description
@@ -580,4 +583,3 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-
