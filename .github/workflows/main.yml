@@ -32,7 +32,7 @@ jobs:
 
     strategy:
       matrix:
-        vaultVer: [ 1.12.2 1.11.6 ]
+        vaultVer: [ "1.12.2", "1.11.6" ]
 
     services:
       vault:
