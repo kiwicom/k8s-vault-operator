@@ -1,0 +1,15 @@
+{
+  "my_prefix": {
+    "a": "example1",
+    "b": 123,
+    "c": {
+      "c1": "example2",
+      "c2": 456
+    },
+    "d": [
+      "first",
+      "second",
+      "third"
+    ]
+  }
+}

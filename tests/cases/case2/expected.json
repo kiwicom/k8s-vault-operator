@@ -1,0 +1,39 @@
+{
+  "project1": {
+    "apikey": {
+      "a": "super-secret-api-key"
+    },
+    "config": {
+      "a": "2"
+    },
+    "secret": {
+      "a": "1",
+      "b": "10"
+    }
+  },
+  "project2": {
+    "config": {
+      "a": "4"
+    },
+    "secret": {
+      "a": "3",
+      "b": "33"
+    }
+  },
+  "team_2_prefixproject1": {
+    "config": {
+      "a": "6"
+    },
+    "secret": {
+      "aa": "5"
+    }
+  },
+  "team_2_prefixproject2": {
+    "config": {
+      "a": "8"
+    },
+    "secret": {
+      "a": "7"
+    }
+  }
+}

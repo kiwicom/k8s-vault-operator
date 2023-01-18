@@ -1,0 +1,7 @@
+{
+  "my_prefix": {
+    "mysecret": "myvalue"
+  },
+  "my_prefixa": "1",
+  "my_prefixb": "10"
+}

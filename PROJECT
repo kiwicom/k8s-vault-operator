@@ -1,0 +1,15 @@
+domain: k8s.kiwi.com
+layout:
+- go.kubebuilder.io/v4-alpha
+projectName: k8s-vault-operator
+repo: github.com/kiwicom/k8s-vault-operator
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: k8s.kiwi.com
+  kind: VaultSecret
+  path: github.com/kiwicom/k8s-vault-operator/api/v1
+  version: v1
+version: "3"

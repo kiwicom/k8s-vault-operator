@@ -1,0 +1,14 @@
+---
+# service account for vault secret sync login in system namespace
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vault-operator-sync
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vault-operator-sync-token-secret
+  annotations:
+    kubernetes.io/service-account.name: vault-operator-sync
+type: kubernetes.io/service-account-token

@@ -1,0 +1,48 @@
+{
+  "a": {
+    "b": {
+      "project1": {
+        "apikey": {
+          "a": "super-secret-api-key"
+        },
+        "config": {
+          "a": "2"
+        },
+        "secret": {
+          "a": "1",
+          "b": "10"
+        }
+      },
+      "project2": {
+        "config": {
+          "a": "4"
+        },
+        "secret": {
+          "a": "3",
+          "b": "33"
+        }
+      }
+    },
+    "bproject1": {
+      "apikey": {
+        "a": "super-secret-api-key"
+      },
+      "config": {
+        "a": "2"
+      },
+      "secret": {
+        "a": "1",
+        "b": "10"
+      }
+    },
+    "bproject2": {
+      "config": {
+        "a": "4"
+      },
+      "secret": {
+        "a": "3",
+        "b": "33"
+      }
+    }
+  }
+}
