@@ -30,9 +30,13 @@ jobs:
   tests:
     runs-on: ubuntu-latest
 
+    strategy:
+      matrix:
+        vaultVer: [ 1.12.2 1.11.6 ]
+
     services:
       vault:
-        image: vault:1.12.2
+        image: vault:${{ matrix.vaultVer }}
         ports:
           - 8200:8200
         options: >-
