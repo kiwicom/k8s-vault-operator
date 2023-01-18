@@ -38,7 +38,7 @@ jobs:
         env:
           VAULT_DEV_ROOT_TOKEN_ID: testtoken
         options: >-
-          -dev
+          --dev
           --log-level=trace
           -dev-listen-address=0.0.0.0:8200
 
