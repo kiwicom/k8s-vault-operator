@@ -35,6 +35,12 @@ jobs:
         image: vault:1.12.2
         ports:
           - 8200:8200
+        env:
+          VAULT_DEV_ROOT_TOKEN_ID: testtoken
+        options: >-
+          -dev
+          --log-level=trace
+          -dev-listen-address=0.0.0.0:8200
 
     steps:
       - name: Checkout code
