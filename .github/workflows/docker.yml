@@ -27,5 +27,5 @@ jobs:
           context: .
           platforms: linux/amd64
           file: ./Dockerfile
-          push: false
+          push: true
           tags: kiwicom/k8s-vault-operator:latest
