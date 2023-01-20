@@ -7,6 +7,68 @@ Syncing vault secrets to k8s secrets.
 ## Description
 This repository contains the code and deployment manifests for a Kubernetes controller, which will automate the process of syncing Vault secrets into Kubernetes secrets.
 
+- [How does the operator work](#how-does-the-operator-work)
+- [Getting started](#getting-started)
+- [Configuration](#operator-configuration)
+- [VaultSecret manifest](#vaultsecret-manifests)
+  - [Service Account authentication](#service-account-authentication)
+  - [Vault paths](#vault-paths)
+  - [Saving to k8s secrets](#saving-to-k8s-secrets)
+- [FAQ](#faq)
+- [Reader tool](#reader-tool)
+- [Debugging](#debugging-the-operator)
+- [Contributing](#contributing)
+
+## How does the operator work?
+
+The operator watches for changes on `VaultSecret` objects. Once a new `VaultSecret` is created or an existing is modified, the operator will receive a notification in its `reconcile loop`. Once inside the loop, it will:
+
+- check validity of `VaultSecret`
+- populate a list of Vault paths (expand recursive paths to a list of absolute paths)
+- read values from all paths and look for overrides (in case of override, it will not sync anything)
+- store combined values into a Kubernetes Secret in either JSON, ENV or YAML format
+- schedule another iteration of the loop after `reconcilePeriod`
+
+---
+
+## Getting Started
+You’ll need a Kubernetes cluster to run against. You can use [KIND](https://sigs.k8s.io/kind) to get a local cluster for testing, or run against a remote cluster.
+**Note:** Your controller will automatically use the current context in your kubeconfig file (i.e. whatever cluster `kubectl cluster-info` shows).
+
+### Running on the cluster
+1. Install Instances of Custom Resources:
+
+```sh
+kubectl apply -f config/samples/
+```
+
+2. Build and push your image to the location specified by `IMG`:
+	
+```sh
+make docker-build docker-push IMG=<some-registry>/k8s-vault-operator:tag
+```
+	
+3. Deploy the controller to the cluster with the image specified by `IMG`:
+
+```sh
+make deploy IMG=<some-registry>/k8s-vault-operator:tag
+```
+
+### Uninstall CRDs
+To delete the CRDs from the cluster:
+
+```sh
+make uninstall
+```
+
+### Undeploy controller
+UnDeploy the controller to the cluster:
+
+```sh
+make undeploy
+```
+___
+
 ## Operator configuration
 
 There are several configuration options available to customize a deployment of an operator. They are set in 3 different places:
@@ -27,19 +89,6 @@ Available configuration options:
 Operator deployment injects environment variables from two Kubernetes Secrets:
 
 - `system/vault-operator-env`: user-specified configuration (described above)
-
----
-
-## How does the operator work?
-
-The operator watches for changes on `VaultSecret` objects. Once a new `VaultSecret` is created or an existing is modified, the operator will receive a notification in its `reconcile loop`. Once inside the loop, it will:
-
-- check validity of `VaultSecret`
-- populate a list of Vault paths (expand recursive paths to a list of absolute paths)
-- read values from all paths and look for overrides (in case of override, it will not sync anything)
-- store combined values into a Kubernetes Secret in either JSON, ENV or YAML format
-- schedule another iteration of the loop after `reconcilePeriod`
-
 
 ---
 
@@ -469,45 +518,14 @@ Operator will save errors and certain key checkpoints as `events` to `VaultSecre
 Old events will be removed after some time, customizable per cluster and on GKE this is set to 1 hour.
 
 ---
-## Getting Started
-You’ll need a Kubernetes cluster to run against. You can use [KIND](https://sigs.k8s.io/kind) to get a local cluster for testing, or run against a remote cluster.
-**Note:** Your controller will automatically use the current context in your kubeconfig file (i.e. whatever cluster `kubectl cluster-info` shows).
-
-### Running on the cluster
-1. Install Instances of Custom Resources:
-
-```sh
-kubectl apply -f config/samples/
-```
-
-2. Build and push your image to the location specified by `IMG`:
-	
-```sh
-make docker-build docker-push IMG=<some-registry>/k8s-vault-operator:tag
-```
-	
-3. Deploy the controller to the cluster with the image specified by `IMG`:
-
-```sh
-make deploy IMG=<some-registry>/k8s-vault-operator:tag
-```
-
-### Uninstall CRDs
-To delete the CRDs from the cluster:
-
-```sh
-make uninstall
-```
-
-### Undeploy controller
-UnDeploy the controller to the cluster:
-
-```sh
-make undeploy
-```
 
 ## Contributing
 // TODO(user): Add detailed information on how you would like others to contribute to this project
+
+- Link the issue
+- Squash commits
+- Lint your code
+- Include relevant test updates/additions
 
 ### How it works
 This project aims to follow the Kubernetes [Operator pattern](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/)
@@ -568,6 +586,11 @@ Tests are using test-env for k8s cluster and Vault server itself. So in order to
    - `vault server -dev -dev-listen-address=0.0.0.0:8200`
 
 Afterwards just run `make test`.
+
+## Code of Conduct
+
+Read the full version [Code of Conduct](/.github/CODE_OF_CONDUCT.md).
+
 ## License
 
 Copyright 2023.
