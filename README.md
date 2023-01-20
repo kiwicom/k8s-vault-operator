@@ -1,6 +1,7 @@
 # k8s-vault-operator
 
 ![Tests](https://github.com/kiwicom/k8s-vault-operator/actions/workflows/main.yml/badge.svg)
+[![Go Reference](https://pkg.go.dev/badge/github.com/kiwicom/k8s-vault-operator.svg)](https://pkg.go.dev/github.com/kiwicom/k8s-vault-operator)
 
 Syncing vault secrets to k8s secrets.
 
