@@ -194,17 +194,19 @@ func (r *Reader) readSecretsFromPaths() error {
 }
 
 func (r *Reader) getPathsRecursive(path string) ([]string, error) {
-	mountPath, pathType, err := kvPreflightVersionRequest(r.client, path)
+	mountPath, version, err := kvPreflightVersionRequest(r.client, path)
 
 	if err != nil {
 		return nil, err
 	}
 
-	if pathType != "kv" {
-		return nil, fmt.Errorf("unsupported engine for recursion, expected %q, got %q", "kv", pathType)
+	if version != 1 && version != 2 {
+		return nil, fmt.Errorf("unsupported engine for recursion, expected 1 or 2, got %d", version)
 	}
-
-	apiPath := addPrefixToVKVPath(path, mountPath, "metadata")
+	apiPath := path
+	if version == 2 {
+		apiPath = addPrefixToKVPath(path, mountPath, "metadata")
+	}
 
 	secretValues, err := r.client.Logical().List(apiPath)
 	if err != nil {

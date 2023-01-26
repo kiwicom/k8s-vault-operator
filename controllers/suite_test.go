@@ -125,7 +125,25 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 	vaultClient.SetToken("testtoken")
 	_, err = NewVaultReconciler(k8sManager, appConfig, vaultClient, k8ClientSet)
+	Expect(err).ToNot(HaveOccurred())
 
+	err = vaultClient.Sys().Mount("v1", &vaultAPI.MountInput{
+		Type: "kv",
+		Config: vaultAPI.MountConfigInput{
+			Options: map[string]string{
+				"version": "1",
+			},
+		},
+		Local: true,
+		Options: map[string]string{
+			"version": "1",
+		},
+	})
+	Expect(err).ToNot(HaveOccurred())
+	for _, d := range v1Data {
+		err = vaultClient.KVv1("v1").Put(ctx, strings.TrimPrefix(d.path, "v1/"), d.data)
+		Expect(err).ToNot(HaveOccurred())
+	}
 	for _, d := range data {
 		_, err = vaultClient.KVv2("secret").Put(ctx, strings.TrimPrefix(d.path, "secret/"), d.data)
 		Expect(err).ToNot(HaveOccurred())
@@ -145,9 +163,12 @@ var _ = AfterSuite(func() {
 		Expect(err).ToNot(HaveOccurred())
 	}
 
+	err := vaultClient.Sys().Unmount("v1")
+	Expect(err).NotTo(HaveOccurred())
+
 	cancel()
 	By("tearing down the test environment")
-	err := testEnv.Stop()
+	err = testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
 
 })
