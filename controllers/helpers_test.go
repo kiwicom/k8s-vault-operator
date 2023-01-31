@@ -45,6 +45,26 @@ func getLogsToVSName(name string) []logEntry {
 }
 
 var (
+	v1Data = []seedData{
+		{
+			path: "v1/something/a/secret",
+			data: map[string]any{
+				"a": "1",
+			},
+		},
+		{
+			path: "v1/something/a/secretx",
+			data: map[string]any{
+				"a": "x",
+			},
+		},
+		{
+			path: "v1/something/b/secret",
+			data: map[string]any{
+				"b": "2",
+			},
+		},
+	}
 	data = []seedData{
 		{
 			path: "secret/seeds/team1/project1/secret",
