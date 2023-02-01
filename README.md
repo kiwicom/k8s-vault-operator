@@ -140,8 +140,29 @@ Quick summary:
 All details about the `spec` are described in the following sections
 
 ### Service Account authentication
+Authentication setup is not handled by operator and needs to be done manually.
+Great [docs](https://developer.hashicorp.com/vault/docs/auth/kubernetes#api) on Hashiscorp website.
 
-By default, a Kubernetes Namespace will contain a Service Account with permissions to access Vault paths relevant for that Namespace. Multiple `VaultSecret` manifests can re-use this Service Account. The name of this Service Account is the same as the name of the Namespace.
+Quick setup for minikube and running operator on host machine:
+```shell
+vault auth enable kubernetes
+kubectl apply -f config/samples/sa.yaml
+export VAULT_SA_NAME=vault-operator-sync-token-secret
+export SA_JWT_TOKEN=$(kubectl get secret $VAULT_SA_NAME -o jsonpath="{.data.token}" | base64 --decode; echo)
+export SA_CA_CRT=$(kubectl get secret $VAULT_SA_NAME -o jsonpath="{.data['ca\.crt']}" | base64 --decode; echo)
+export K8S_HOST="localhost:8080"
+kubectl proxy --port=8080
+vault write auth/kubernetes/config token_reviewer_jwt="$SA_JWT_TOKEN" kubernetes_host="http://$K8S_HOST" kubernetes_ca_cert="$SA_CA_CRT"
+vault policy write mypolicy config/samples/policy.hcl
+vault write auth/kubernetes/role/vault-operator \
+  bound_service_account_names=vault-operator-sync \
+  bound_service_account_namespaces=default \
+  policies=default,mypolicy \
+  ttl=24h
+```
+
+Now you can create secret in Vault, e.g. `secret/mysecret` and `kubectl apply -f ./config/samples/v1_vaultsecret.yaml`.
+Afterwards you should see K8s secret.
 
 Full example:
 
