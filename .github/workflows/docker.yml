@@ -28,4 +28,6 @@ jobs:
           platforms: linux/amd64
           file: ./Dockerfile
           push: true
-          tags: kiwicom/k8s-vault-operator:latest
+          tags: |
+            kiwicom/k8s-vault-operator:latest
+            kiwicom/k8s-vault-operator:${{github.ref_name}}
