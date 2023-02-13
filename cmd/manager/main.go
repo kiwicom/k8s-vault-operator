@@ -39,6 +39,7 @@ import (
 	k8skiwicomv1 "github.com/kiwicom/k8s-vault-operator/api/v1"
 	"github.com/kiwicom/k8s-vault-operator/controllers"
 	"github.com/kiwicom/k8s-vault-operator/pkg/vault"
+	//nolint:gci
 	//+kubebuilder:scaffold:imports
 )
 
