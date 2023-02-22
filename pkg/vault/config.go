@@ -15,26 +15,28 @@ import (
 var k = koanf.New(".")
 
 type AppConfig struct {
-	LogLevel               string        `koanf:"log_level"`
-	ClientTimeout          time.Duration `koanf:"client_timeout"`
-	ClientMaxRetries       int           `koanf:"client_max_retries"`
-	DefaultSAAuthPath      string        `koanf:"default_sa_auth_path"`
-	DefaultSAName          string        `koanf:"default_sa_name"`
-	DefaultReconcilePeriod string        `koanf:"default_reconcile_period"`
-	OperatorRole           string        `koanf:"operator_role"`
-	Role                   string        `koanf:"role"`
-	DefaultVaultAddr       string        `koanf:"vault_addr"`
+	LogLevel                string        `koanf:"log_level"`
+	ClientTimeout           time.Duration `koanf:"client_timeout"`
+	ClientMaxRetries        int           `koanf:"client_max_retries"`
+	DefaultSAAuthPath       string        `koanf:"default_sa_auth_path"`
+	DefaultSAName           string        `koanf:"default_sa_name"`
+	DefaultReconcilePeriod  string        `koanf:"default_reconcile_period"`
+	OperatorRole            string        `koanf:"operator_role"`
+	Role                    string        `koanf:"role"`
+	DefaultVaultAddr        string        `koanf:"vault_addr"`
+	MaxConcurrentReconciles int           `koanf:"max_concurrent_reconciles"`
 }
 
 func NewAppConfig() (AppConfig, error) {
 	var cfg AppConfig
 	err := k.Load(confmap.Provider(map[string]any{
-		"log_level":                "INFO",
-		"default_sa_auth_path":     "",
-		"default_sa_name":          "vault-operator-sync",
-		"default_reconcile_period": "10m",
-		"operator_role":            "vault-operator",
-		"vault_addr":               "http://127.0.0.1:8200",
+		"log_level":                 "INFO",
+		"default_sa_auth_path":      "",
+		"default_sa_name":           "vault-operator-sync",
+		"default_reconcile_period":  "10m",
+		"operator_role":             "vault-operator",
+		"vault_addr":                "http://127.0.0.1:8200",
+		"max_concurrent_reconciles": 5,
 	}, "."), nil)
 	if err != nil {
 		return cfg, fmt.Errorf("default setting load: %w", err)
