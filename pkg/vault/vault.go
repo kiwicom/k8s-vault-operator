@@ -6,7 +6,6 @@ import (
 	"io"
 	"strings"
 	"time"
-	"unicode"
 
 	"github.com/go-logr/logr"
 	"github.com/hashicorp/go-retryablehttp"
@@ -177,13 +176,10 @@ func (r *Reader) readSecretsFromPaths() error {
 				}
 				return err
 			}
-
-			// the keys might contain only letter, numbers and -,_ characters
-			// otherwise the key is ignored
 			for k, v := range secretsData {
-				if ok := r.validateKey(k); !ok {
-					r.log.Error(fmt.Errorf("invalid key: %v", k), k)
-					continue
+				_, ok := secrets[k]
+				if ok {
+					r.log.Error(fmt.Errorf("duplicate secret key: %v", k), "overriding secret key", "key", k)
 				}
 				secrets[k] = v
 			}
@@ -308,14 +304,4 @@ func (r *Reader) createVaultData() error {
 	r.data = rootNode
 
 	return nil
-}
-
-func (r *Reader) validateKey(key string) bool {
-	for _, r := range key {
-		// The keys of data  must consist of alphanumeric characters, -, _ or .
-		if !unicode.IsLetter(r) && !unicode.IsNumber(r) && r != '-' && r != '.' && r != '_' {
-			return false
-		}
-	}
-	return true
 }

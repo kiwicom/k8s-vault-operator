@@ -154,7 +154,7 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, err
 	}
 
-	k8sSecret, err := vault.NewSecret(&vaultSecret, reader.GetData())
+	k8sSecret, err := vault.NewSecret(ctx, &vaultSecret, reader.GetData())
 	if err != nil {
 		logger.Info(fmt.Sprintf("VaultOperator sync rejected: %v", err))
 		r.EventRecorder.Warning(&vaultSecret, "sync rejected", err)
