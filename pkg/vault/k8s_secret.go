@@ -1,8 +1,12 @@
 package vault
 
 import (
+	"context"
 	"fmt"
+	"github.com/go-logr/logr"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"strings"
+	"unicode"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -14,7 +18,17 @@ const (
 	ManagedByLabel = "vault-secret-operator"
 )
 
-func secretsAsEnv(secret *v1.VaultSecret, secrets Data) (map[string][]byte, error) {
+func validateEnvKey(key string) bool {
+	for _, r := range key {
+		// The keys of data  must consist of alphanumeric characters, -, _ or .
+		if !unicode.IsLetter(r) && !unicode.IsNumber(r) && r != '-' && r != '.' && r != '_' {
+			return false
+		}
+	}
+	return true
+}
+
+func secretsAsEnv(logger logr.Logger, secret *v1.VaultSecret, secrets Data) (map[string][]byte, error) {
 	envSecrets, err := secrets.ENV(secret.Spec.GetSeparator())
 	if err != nil {
 		return nil, err
@@ -23,6 +37,10 @@ func secretsAsEnv(secret *v1.VaultSecret, secrets Data) (map[string][]byte, erro
 	output := make(map[string][]byte, len(envSecrets))
 
 	for key, val := range envSecrets {
+		if !validateEnvKey(key) {
+			logger.Error(fmt.Errorf("invalid key %q", key), "invalid key", "key", key)
+			continue
+		}
 		output[key] = []byte(fmt.Sprintf("%v", val))
 	}
 
@@ -57,18 +75,19 @@ func secretsAsFile(secrets Data, format string) (map[string][]byte, error) {
 	return output, nil
 }
 
-func NewSecret(vaultSecret *v1.VaultSecret, data Data) (*corev1.Secret, error) {
+func NewSecret(ctx context.Context, vaultSecret *v1.VaultSecret, data Data) (*corev1.Secret, error) {
 	var (
 		err      error
 		contents map[string][]byte
 		format   = strings.ToLower(vaultSecret.Spec.TargetFormat)
 	)
+	logger := ctrl.LoggerFrom(ctx)
 
 	switch format {
 	case TypeYaml, TypeJSON:
 		contents, err = secretsAsFile(data, format)
 	case TypeEnv:
-		contents, err = secretsAsEnv(vaultSecret, data)
+		contents, err = secretsAsEnv(logger, vaultSecret, data)
 	default:
 		return nil, fmt.Errorf("invalid target format: %q", format)
 	}

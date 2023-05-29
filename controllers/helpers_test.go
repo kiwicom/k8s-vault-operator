@@ -151,5 +151,13 @@ var (
 				},
 			},
 		},
+		{
+			path: "secret/seeds/json",
+			data: map[string]any{
+				"email@example.com": "1",
+				" space":            "10",
+				"valid":             "key",
+			},
+		},
 	}
 )
