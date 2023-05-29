@@ -3,12 +3,13 @@ package vault
 import (
 	"errors"
 	"fmt"
-	"github.com/go-logr/logr"
-	"github.com/hashicorp/go-retryablehttp"
-	vaultApi "github.com/hashicorp/vault/api"
 	"io"
 	"strings"
 	"time"
+
+	"github.com/go-logr/logr"
+	"github.com/hashicorp/go-retryablehttp"
+	vaultApi "github.com/hashicorp/vault/api"
 
 	v1 "github.com/kiwicom/k8s-vault-operator/api/v1"
 )
