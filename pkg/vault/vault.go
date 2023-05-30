@@ -173,6 +173,9 @@ func (r *Reader) readSecretsFromPaths() error {
 					// make a log entry and skip the broken path
 					r.log.Error(err, absolutePath)
 					continue
+				} else if errors.Is(err, ErrEmpty) {
+					// ignore empty paths
+					continue
 				}
 				return err
 			}
