@@ -123,14 +123,14 @@ func kvReadRequest(client *api.Client, path string, params map[string]string) (*
 		switch parseErr {
 		case nil:
 		case io.EOF:
-			return nil, nil
+			return nil, ErrNotFound
 		default:
 			return nil, err
 		}
 		if secret != nil && (len(secret.Warnings) > 0 || len(secret.Data) > 0) {
 			return secret, nil
 		}
-		return nil, nil
+		return nil, ErrNotFound
 	}
 	if err != nil {
 		return nil, err

@@ -2,6 +2,7 @@ package vault
 
 import (
 	"context"
+	//nolint:gosec
 	"crypto/sha1"
 	"fmt"
 	"strings"
@@ -99,6 +100,7 @@ func NewSecret(ctx context.Context, vaultSecret *v1.VaultSecret, data Data) (*co
 
 	owner := vaultSecret.Name
 	if len(owner) > 63 {
+		//nolint:gosec
 		s := sha1.New()
 		s.Write([]byte(owner))
 		owner = fmt.Sprintf("%x", s.Sum(nil))

@@ -159,5 +159,8 @@ var (
 				"valid":             "key",
 			},
 		},
+		{
+			path: "secret/seeds/empty",
+		},
 	}
 )
