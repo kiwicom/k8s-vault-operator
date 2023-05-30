@@ -2,6 +2,7 @@ package vault
 
 import (
 	"context"
+	"crypto/sha1"
 	"fmt"
 	"strings"
 	"unicode"
@@ -96,8 +97,15 @@ func NewSecret(ctx context.Context, vaultSecret *v1.VaultSecret, data Data) (*co
 		return nil, err
 	}
 
+	owner := vaultSecret.Name
+	if len(owner) > 63 {
+		s := sha1.New()
+		s.Write([]byte(owner))
+		owner = fmt.Sprintf("%x", s.Sum(nil))
+	}
+
 	labels := map[string]string{
-		"owner":      vaultSecret.Name,
+		"owner":      owner,
 		"managed-by": ManagedByLabel,
 	}
 

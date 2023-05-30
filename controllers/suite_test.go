@@ -218,7 +218,9 @@ var _ = Describe("Cases", func() {
 
 			var vs k8skiwicomv1.VaultSecret
 			err = yaml.NewDecoder(fVS).Decode(&vs)
-			vs.Name = caseDir
+			if vs.Name == "" {
+				vs.Name = caseDir
+			}
 			vs.Spec.TargetSecretName = caseDir
 			vs.Spec.Auth.Token = "testtoken"
 			vs.Namespace = namespace
