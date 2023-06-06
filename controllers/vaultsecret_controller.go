@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sync"
 	"time"
 
 	vaultAPI "github.com/hashicorp/vault/api"
@@ -51,6 +52,8 @@ type VaultSecretReconciler struct {
 	VaultConfig   vault.AppConfig
 	VaultClient   *vaultAPI.Client
 	K8ClientSet   *kubernetes.Clientset
+	authSACache   map[string]*vault.AuthServiceAccount
+	saCacheMx     sync.RWMutex
 }
 
 func NewVaultReconciler(mgr manager.Manager, cfg vault.AppConfig, vaultClient *vaultAPI.Client,
@@ -62,6 +65,7 @@ func NewVaultReconciler(mgr manager.Manager, cfg vault.AppConfig, vaultClient *v
 		VaultConfig:   cfg,
 		VaultClient:   vaultClient,
 		K8ClientSet:   k8ClientSet,
+		authSACache:   make(map[string]*vault.AuthServiceAccount),
 	}
 	err := reconciler.setupWithManager(mgr)
 	if err != nil {
@@ -132,17 +136,12 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	if vaultSecret.Spec.Auth.Token != "" {
 		tokener = vault.NewAuthToken(vaultSecret.Spec.Auth.Token)
 	} else {
-		saRef := vaultSecret.Spec.Auth.ServiceAccountRef
-		vaultClient, err := r.VaultClient.Clone()
+		saAccount, err := r.getAuthServiceAccount(vaultSecret)
 		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("vault client clone: %w", err)
+			return ctrl.Result{}, fmt.Errorf("get auth service account: %w", err)
 		}
-		if err := vaultClient.SetAddress(vaultSecret.Spec.Addr); err != nil {
-			return ctrl.Result{}, fmt.Errorf("vault set address: %w", err)
-		}
-		tokener = vault.NewAuthServiceAccount(vaultClient, r.K8ClientSet, saRef.Name, vaultSecret.Namespace, saRef.Role, saRef.AuthPath, false)
+		tokener = saAccount
 	}
-
 	reader, err := vault.NewReader(tokener, &vaultSecret, logger, &r.VaultConfig)
 	if err != nil {
 		r.EventRecorder.Warning(&vaultSecret, "vault failed", err)
@@ -203,6 +202,34 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	return ctrl.Result{RequeueAfter: reconcileAfter}, nil
+}
+
+func (r *VaultSecretReconciler) cachedSA(id string) *vault.AuthServiceAccount {
+	r.saCacheMx.Lock()
+	defer r.saCacheMx.Unlock()
+	return r.authSACache[id]
+}
+
+func (r *VaultSecretReconciler) getAuthServiceAccount(vaultSecret k8skiwicomv1.VaultSecret) (*vault.AuthServiceAccount, error) {
+	saRef := vaultSecret.Spec.Auth.ServiceAccountRef
+	id := fmt.Sprintf("%s-%s-%s-%s-%s", vaultSecret.Spec.Addr, vaultSecret.Namespace, saRef.Name, saRef.Role, saRef.AuthPath)
+	saAccount := r.cachedSA(id)
+	if saAccount != nil {
+		return saAccount, nil
+	}
+
+	vaultClient, err := r.VaultClient.Clone()
+	if err != nil {
+		return nil, fmt.Errorf("vault client clone: %w", err)
+	}
+	if err := vaultClient.SetAddress(vaultSecret.Spec.Addr); err != nil {
+		return nil, fmt.Errorf("vault set address: %w", err)
+	}
+	saAccount = vault.NewAuthServiceAccount(vaultClient, r.K8ClientSet, saRef.Name, vaultSecret.Namespace, saRef.Role, saRef.AuthPath, false)
+	r.saCacheMx.Lock()
+	defer r.saCacheMx.Unlock()
+	r.authSACache[id] = saAccount
+	return saAccount, nil
 }
 
 // setupWithManager sets up the controller with the Manager.
