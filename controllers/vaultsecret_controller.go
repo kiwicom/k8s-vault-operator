@@ -205,8 +205,8 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 }
 
 func (r *VaultSecretReconciler) cachedSA(id string) *vault.AuthServiceAccount {
-	r.saCacheMx.Lock()
-	defer r.saCacheMx.Unlock()
+	r.saCacheMx.RLock()
+	defer r.saCacheMx.RUnlock()
 	return r.authSACache[id]
 }
 
