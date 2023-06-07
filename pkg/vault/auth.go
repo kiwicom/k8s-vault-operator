@@ -55,8 +55,8 @@ func NewAuthServiceAccount(vaultClient *vaultApi.Client, k8ClientSet *kubernetes
 	}
 }
 func (a *AuthServiceAccount) cachedToken() string {
-	a.cacheMx.Lock()
-	defer a.cacheMx.Unlock()
+	a.cacheMx.RLock()
+	defer a.cacheMx.RUnlock()
 	return a.cachedVaultToken
 }
 
