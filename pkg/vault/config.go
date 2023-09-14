@@ -25,6 +25,7 @@ type AppConfig struct {
 	Role                    string        `koanf:"role"`
 	DefaultVaultAddr        string        `koanf:"vault_addr"`
 	MaxConcurrentReconciles int           `koanf:"max_concurrent_reconciles"`
+	TokenCacheDuration      time.Duration `koanf:"token_cache_duration"`
 }
 
 func NewAppConfig() (AppConfig, error) {
@@ -37,6 +38,7 @@ func NewAppConfig() (AppConfig, error) {
 		"operator_role":             "vault-operator",
 		"vault_addr":                "http://127.0.0.1:8200",
 		"max_concurrent_reconciles": 5,
+		"token_cache_duration":      time.Minute * 2,
 	}, "."), nil)
 	if err != nil {
 		return cfg, fmt.Errorf("default setting load: %w", err)
