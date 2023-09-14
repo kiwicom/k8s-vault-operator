@@ -34,11 +34,11 @@ jobs:
 
     strategy:
       matrix:
-        vaultVer: [ "latest", "1.12.6" ]
+        vaultVer: [ "latest", "1.14", "1.13", "1.12" ]
 
     services:
       vault:
-        image: vault:${{ matrix.vaultVer }}
+        image: docker.io/hashicorp/vault:${{ matrix.vaultVer }}
         ports:
           - 8200:8200
         options: >-
