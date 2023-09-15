@@ -225,7 +225,8 @@ func (r *VaultSecretReconciler) getAuthServiceAccount(vaultSecret k8skiwicomv1.V
 	if err := vaultClient.SetAddress(vaultSecret.Spec.Addr); err != nil {
 		return nil, fmt.Errorf("vault set address: %w", err)
 	}
-	saAccount = vault.NewAuthServiceAccount(vaultClient, r.K8ClientSet, saRef.Name, vaultSecret.Namespace, saRef.Role, saRef.AuthPath, false)
+	saAccount = vault.NewAuthServiceAccount(vaultClient, r.K8ClientSet, saRef.Name, vaultSecret.Namespace, saRef.Role,
+		saRef.AuthPath, false, r.VaultConfig.RefreshTokenBefore)
 	r.saCacheMx.Lock()
 	defer r.saCacheMx.Unlock()
 	r.authSACache[id] = saAccount
