@@ -30,30 +30,30 @@ func (a AuthToken) Token() (string, error) {
 }
 
 type AuthServiceAccount struct {
-	name             string
-	namespace        string
-	role             string
-	cachedDuration   time.Duration
-	path             string
-	vaultClient      *vaultApi.Client
-	autoMount        bool
-	k8ClientSet      *kubernetes.Clientset
-	cacheMx          sync.RWMutex
-	cachedVaultToken string
-	vaultTokenExpire time.Time
+	name               string
+	namespace          string
+	role               string
+	refreshTokenBefore time.Duration
+	path               string
+	vaultClient        *vaultApi.Client
+	autoMount          bool
+	k8ClientSet        *kubernetes.Clientset
+	cacheMx            sync.RWMutex
+	cachedVaultToken   string
+	vaultTokenExpire   time.Time
 }
 
 func NewAuthServiceAccount(vaultClient *vaultApi.Client, k8ClientSet *kubernetes.Clientset,
-	name, namespace, role, path string, automount bool, cachedDuration time.Duration) *AuthServiceAccount {
+	name, namespace, role, path string, automount bool, refreshTokenBefore time.Duration) *AuthServiceAccount {
 	return &AuthServiceAccount{
-		name:           name,
-		namespace:      namespace,
-		role:           role,
-		path:           path,
-		vaultClient:    vaultClient,
-		autoMount:      automount,
-		k8ClientSet:    k8ClientSet,
-		cachedDuration: cachedDuration,
+		name:               name,
+		namespace:          namespace,
+		role:               role,
+		path:               path,
+		vaultClient:        vaultClient,
+		autoMount:          automount,
+		k8ClientSet:        k8ClientSet,
+		refreshTokenBefore: refreshTokenBefore,
 	}
 }
 func (a *AuthServiceAccount) cachedToken() string {
@@ -64,7 +64,7 @@ func (a *AuthServiceAccount) cachedToken() string {
 
 func (a *AuthServiceAccount) Token() (string, error) {
 	vaultToken := a.cachedToken()
-	if vaultToken != "" && time.Now().Add(a.cachedDuration).Before(a.vaultTokenExpire) {
+	if vaultToken != "" && time.Now().Add(a.refreshTokenBefore).Before(a.vaultTokenExpire) {
 		return vaultToken, nil
 	}
 
