@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/hashicorp/go-retryablehttp"
 	vaultApi "github.com/hashicorp/vault/api"
+	"golang.org/x/sync/errgroup"
 
 	v1 "github.com/kiwicom/k8s-vault-operator/api/v1"
 )
@@ -165,28 +167,38 @@ func (r *Reader) readSecretsFromPaths() error {
 		reconcilePeriod: reconcilePeriod,
 	}
 
+	var wg errgroup.Group
+	wg.SetLimit(20)
 	for _, pathData := range r.paths {
 		for absolutePath, secrets := range pathData.Paths {
-			secretsData, err := pathReader.Read(absolutePath)
-			if err != nil {
-				if errors.Is(err, ErrNotFound) {
-					// make a log entry and skip the broken path
-					r.log.Error(err, absolutePath)
-					continue
-				} else if errors.Is(err, ErrEmpty) {
-					// ignore empty paths
-					continue
+			absolutePath := absolutePath
+			secrets := secrets
+			wg.Go(func() error {
+				secretsData, err := pathReader.Read(absolutePath)
+				if err != nil {
+					if errors.Is(err, ErrNotFound) {
+						// make a log entry and skip the broken path
+						r.log.Error(err, absolutePath)
+						return nil
+					} else if errors.Is(err, ErrEmpty) {
+						// ignore empty paths
+						return nil
+					}
+					return err
 				}
-				return err
-			}
-			for k, v := range secretsData {
-				_, ok := secrets[k]
-				if ok {
-					r.log.Error(fmt.Errorf("duplicate secret key: %v", k), "overriding secret key", "key", k)
+				for k, v := range secretsData {
+					_, ok := secrets[k]
+					if ok {
+						r.log.Error(fmt.Errorf("duplicate secret key: %v", k), "overriding secret key", "key", k)
+					}
+					secrets[k] = v
 				}
-				secrets[k] = v
-			}
+				return nil
+			})
 		}
+	}
+	if err := wg.Wait(); err != nil {
+		return err
 	}
 
 	return nil
@@ -222,6 +234,14 @@ func (r *Reader) getPathsRecursive(path string) ([]string, error) {
 	}
 
 	var paths []string
+	var wg errgroup.Group
+	var mx sync.Mutex
+	appendPaths := func(subPaths ...string) {
+		mx.Lock()
+		defer mx.Unlock()
+		paths = append(paths, subPaths...)
+	}
+	wg.SetLimit(10)
 	for _, k := range keys {
 		key, ok := k.(string)
 		if !ok {
@@ -229,20 +249,25 @@ func (r *Reader) getPathsRecursive(path string) ([]string, error) {
 		}
 
 		fullPath := path + key
-
-		// check if current key is a directory
-		if key[len(key)-1] == '/' {
-			// and fetch all subPaths
-			subPaths, err := r.getPathsRecursive(fullPath)
-			if err != nil {
-				return nil, err
+		wg.Go(func() error {
+			// check if current key is a directory
+			if key[len(key)-1] == '/' {
+				// and fetch all subPaths
+				subPaths, err := r.getPathsRecursive(fullPath)
+				if err != nil {
+					return err
+				}
+				// and append them to the list
+				appendPaths(subPaths...)
+			} else {
+				// else, just add it to the list
+				appendPaths(fullPath)
 			}
-
-			paths = append(paths, subPaths...)
-		} else {
-			// else, just add it to the list
-			paths = append(paths, fullPath)
-		}
+			return nil
+		})
+	}
+	if err := wg.Wait(); err != nil {
+		return nil, err
 	}
 
 	return paths, nil
