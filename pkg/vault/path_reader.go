@@ -1,6 +1,7 @@
 package vault
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -20,8 +21,8 @@ var (
 	ErrEmpty    = errors.New("path is empty")
 )
 
-func (r *PathReader) Read(path string) (map[string]any, error) {
-	mountPath, version, err := kvPreflightVersionRequest(r.Client, path)
+func (r *PathReader) Read(ctx context.Context, path string) (map[string]any, error) {
+	mountPath, version, err := kvPreflightVersionRequest(ctx, r.Client, path)
 
 	if err != nil {
 		return nil, err
@@ -35,7 +36,7 @@ func (r *PathReader) Read(path string) (map[string]any, error) {
 		return nil, fmt.Errorf("unsupported secret engine version %d", version)
 	}
 
-	secret, err := kvReadRequest(r.Client, path, nil)
+	secret, err := kvReadRequest(ctx, r.Client, path, nil)
 
 	if err != nil {
 		return nil, err

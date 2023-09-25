@@ -1,6 +1,7 @@
 package vault
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -57,12 +58,12 @@ func (r *Reader) GetData() Data {
 	return r.data
 }
 
-func (r *Reader) ReadData() error {
-	if err := r.getAbsolutePaths(); err != nil {
+func (r *Reader) ReadData(ctx context.Context) error {
+	if err := r.getAbsolutePaths(ctx); err != nil {
 		return fmt.Errorf("failed to get paths from vault: %w", err)
 	}
 
-	if err := r.readSecretsFromPaths(); err != nil {
+	if err := r.readSecretsFromPaths(ctx); err != nil {
 		return fmt.Errorf("failed to read paths from vault: %w", err)
 	}
 
@@ -107,7 +108,7 @@ func (r *Reader) WriteData(w io.Writer, format string) error {
 // getAbsolutePaths populates []PathData with absolute paths to Vault secrets.
 // In the case of "secret/recursive/path/*", it will recursively call Vault and
 // find all child Secrets with their absolute paths.
-func (r *Reader) getAbsolutePaths() error {
+func (r *Reader) getAbsolutePaths(ctx context.Context) error {
 	for _, path := range r.secret.Spec.Paths {
 		paths := make(map[string]Secrets)
 		var cleanedPath string
@@ -123,7 +124,7 @@ func (r *Reader) getAbsolutePaths() error {
 			// remove "*" before calling Vault
 			cleanedPath = path.Path[0 : len(path.Path)-1]
 
-			subPaths, err := r.getPathsRecursive(cleanedPath)
+			subPaths, err := r.getPathsRecursive(ctx, cleanedPath)
 			if err != nil {
 				return err
 			}
@@ -155,7 +156,7 @@ func (r *Reader) getAbsolutePaths() error {
 // This function don't take list of paths and don't return the secrets.
 // Instead of this, the function works with reader's state. Don't know the
 // exact reason. Anyway the secrets are filled into reader's stateReader.
-func (r *Reader) readSecretsFromPaths() error {
+func (r *Reader) readSecretsFromPaths(ctx context.Context) error {
 	reconcilePeriod, err := time.ParseDuration(r.secret.Spec.ReconcilePeriod)
 	if err != nil {
 		return fmt.Errorf("failed to parse reconcile period %q: %w", r.secret.Spec.ReconcilePeriod, err)
@@ -167,14 +168,14 @@ func (r *Reader) readSecretsFromPaths() error {
 		reconcilePeriod: reconcilePeriod,
 	}
 
-	var wg errgroup.Group
+	wg, gCtx := errgroup.WithContext(ctx)
 	wg.SetLimit(20)
 	for _, pathData := range r.paths {
 		for absolutePath, secrets := range pathData.Paths {
 			absolutePath := absolutePath
 			secrets := secrets
 			wg.Go(func() error {
-				secretsData, err := pathReader.Read(absolutePath)
+				secretsData, err := pathReader.Read(gCtx, absolutePath)
 				if err != nil {
 					if errors.Is(err, ErrNotFound) {
 						// make a log entry and skip the broken path
@@ -204,8 +205,8 @@ func (r *Reader) readSecretsFromPaths() error {
 	return nil
 }
 
-func (r *Reader) getPathsRecursive(path string) ([]string, error) {
-	mountPath, version, err := kvPreflightVersionRequest(r.client, path)
+func (r *Reader) getPathsRecursive(ctx context.Context, path string) ([]string, error) {
+	mountPath, version, err := kvPreflightVersionRequest(ctx, r.client, path)
 
 	if err != nil {
 		return nil, err
@@ -219,7 +220,7 @@ func (r *Reader) getPathsRecursive(path string) ([]string, error) {
 		apiPath = addPrefixToKVPath(path, mountPath, "metadata")
 	}
 
-	secretValues, err := r.client.Logical().List(apiPath)
+	secretValues, err := r.client.Logical().ListWithContext(ctx, apiPath)
 	if err != nil {
 		return nil, fmt.Errorf("could not read Vault path %q: %w", apiPath, err)
 	}
@@ -234,7 +235,7 @@ func (r *Reader) getPathsRecursive(path string) ([]string, error) {
 	}
 
 	var paths []string
-	var wg errgroup.Group
+	wg, gCtx := errgroup.WithContext(ctx)
 	var mx sync.Mutex
 	appendPaths := func(subPaths ...string) {
 		mx.Lock()
@@ -253,7 +254,7 @@ func (r *Reader) getPathsRecursive(path string) ([]string, error) {
 			// check if current key is a directory
 			if key[len(key)-1] == '/' {
 				// and fetch all subPaths
-				subPaths, err := r.getPathsRecursive(fullPath)
+				subPaths, err := r.getPathsRecursive(gCtx, fullPath)
 				if err != nil {
 					return err
 				}

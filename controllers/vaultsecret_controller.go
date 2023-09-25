@@ -148,7 +148,7 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, err
 	}
 
-	if err := reader.ReadData(); err != nil {
+	if err := reader.ReadData(ctx); err != nil {
 		r.EventRecorder.Warning(&vaultSecret, "vault read failed", err)
 		return ctrl.Result{}, err
 	}
