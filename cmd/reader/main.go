@@ -47,7 +47,7 @@ func main() {
 		stdlog.Fatal(err)
 	}
 
-	err = vaultReader.ReadData()
+	err = vaultReader.ReadData(ctx)
 	if err != nil {
 		stdlog.Fatal(err)
 	}

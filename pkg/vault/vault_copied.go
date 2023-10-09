@@ -2,6 +2,7 @@
 package vault
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -12,7 +13,7 @@ import (
 )
 
 // copied from https://github.com/hashicorp/vault/blob/main/command/kv_helpers.go#L44
-func kvPreflightVersionRequest(client *api.Client, path string) (string, int, error) {
+func kvPreflightVersionRequest(ctx context.Context, client *api.Client, path string) (string, int, error) {
 	// We don't want to use a wrapping call here so save any custom value and
 	// restore after
 	currentWrappingLookupFunc := client.CurrentWrappingLookupFunc()
@@ -26,7 +27,7 @@ func kvPreflightVersionRequest(client *api.Client, path string) (string, int, er
 	defer client.SetOutputPolicy(currentOutputPolicy)
 
 	r := client.NewRequest("GET", "/v1/sys/internal/ui/mounts/"+path)
-	resp, err := client.RawRequest(r)
+	resp, err := client.RawRequestWithContext(ctx, r)
 	if resp != nil {
 		defer resp.Body.Close()
 	}
@@ -109,12 +110,12 @@ func addPrefixToKVPath(p, mountPath, apiPrefix string) string {
 }
 
 // copied from https://github.com/hashicorp/vault/blob/main/command/kv_helpers.go#L15
-func kvReadRequest(client *api.Client, path string, params map[string]string) (*api.Secret, error) {
+func kvReadRequest(ctx context.Context, client *api.Client, path string, params map[string]string) (*api.Secret, error) {
 	r := client.NewRequest("GET", "/v1/"+path)
 	for k, v := range params {
 		r.Params.Set(k, v)
 	}
-	resp, err := client.RawRequest(r)
+	resp, err := client.RawRequestWithContext(ctx, r)
 	if resp != nil {
 		defer resp.Body.Close()
 	}
