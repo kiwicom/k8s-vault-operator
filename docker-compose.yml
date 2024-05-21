@@ -2,7 +2,7 @@ version: '3'
 
 services:
   vault:
-    image: vault:1.12.6
+    image: hashicorp/vault:1.16.2
     cap_add:
       - IPC_LOCK
     ports:

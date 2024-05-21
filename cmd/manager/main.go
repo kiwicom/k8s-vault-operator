@@ -35,6 +35,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	k8skiwicomv1 "github.com/kiwicom/k8s-vault-operator/api/v1"
 	"github.com/kiwicom/k8s-vault-operator/controllers"
@@ -93,10 +95,16 @@ func main() {
 	ctrl.SetLogger(logger)
 	printVersion(logger)
 
+	webhookOpts := webhook.Options{
+		Port: 9443,
+	}
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:                 scheme,
-		MetricsBindAddress:     metricsAddr,
-		Port:                   9443,
+		Scheme:        scheme,
+		WebhookServer: webhook.NewServer(webhookOpts),
+		Metrics: server.Options{
+			BindAddress: metricsAddr,
+		},
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "7efd0e49.k8s.kiwi.com",
