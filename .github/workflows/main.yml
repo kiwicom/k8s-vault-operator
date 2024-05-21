@@ -34,7 +34,7 @@ jobs:
 
     strategy:
       matrix:
-        vaultVer: [ "latest", "1.14", "1.13", "1.12" ]
+        vaultVer: [ "latest", "1.16", "1.15", "1.14" ]
 
     services:
       vault:
