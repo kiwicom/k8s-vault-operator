@@ -46,7 +46,7 @@ import (
 
 // VaultSecretReconciler reconciles a VaultSecret object
 type VaultSecretReconciler struct {
-	client.Client
+	Client        client.Client
 	Scheme        *runtime.Scheme
 	EventRecorder *EventRecorder
 	VaultConfig   vault.AppConfig
