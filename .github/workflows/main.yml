@@ -16,18 +16,17 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
           go-version: "1.x"
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v3
+        uses: golangci/golangci-lint-action@v7
         with:
           version: latest
-          args: --timeout 3m
 
   tests:
     runs-on: ubuntu-latest
@@ -55,21 +54,21 @@ jobs:
           echo "go-mod=$(go env GOMODCACHE)" >> $GITHUB_OUTPUT
 
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
           go-version: "1.x"
 
       - name: Go Build Cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ${{ steps.go-cache-paths.outputs.go-build }}
           key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
 
       - name: Go Mod Cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ${{ steps.go-cache-paths.outputs.go-mod }}
           key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
