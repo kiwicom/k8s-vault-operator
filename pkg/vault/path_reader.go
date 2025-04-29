@@ -49,9 +49,8 @@ func (r *PathReader) Read(ctx context.Context, path string) (map[string]any, err
 	if version == 2 {
 		if data, ok := secret.Data["data"]; ok && data != nil {
 			return data.(map[string]any), nil
-		} else {
-			return nil, fmt.Errorf("%w: %s", ErrEmpty, path)
 		}
+		return nil, fmt.Errorf("%w: %s", ErrEmpty, path)
 	}
 
 	return secret.Data, nil

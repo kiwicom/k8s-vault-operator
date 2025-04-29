@@ -1,135 +1,70 @@
+version: "2"
 run:
   modules-download-mode: readonly
 output:
   formats:
-    - format: colored-line-number
-  # Print lines of code with issue.
-  # Default: true
-  print-issued-lines: true
-  # Print linter name in the end of issue text.
-  # Default: true
-  print-linter-name: true
-  # Make issues output unique by line.
-  # Default: true
-  uniq-by-line: false
-  # Add a prefix to the output file references.
-  # Default is no prefix.
+    text:
+      path: stdout
+      print-linter-name: true
+      print-issued-lines: true
   path-prefix: ""
-  # Sort results by: filepath, line and column.
-  sort-results: false
-# All available settings of specific linters.
 linters:
+  enable:
+    - bodyclose
+    - durationcheck
+    - errname
+    - errorlint
+    - gocritic
+    - gosec
+    - ireturn
+    - lll
+    - misspell
+    - nakedret
+    - nestif
+    - nilerr
+    - nonamedreturns
+    - prealloc
+    - predeclared
+    - revive
+    - staticcheck
+    - unconvert
+    - whitespace
   disable:
     - unused
-  # Enable specific linter
-  # https://golangci-lint.run/usage/linters/#enabled-by-default
+  settings:
+    lll:
+      line-length: 160
+    revive:
+      rules:
+        - name: dot-imports
+          severity: warning
+          disabled: false
+          exclude: [""]
+          arguments:
+            - allowed-packages: ["github.com/onsi/ginkgo/v2", "github.com/onsi/gomega"]
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
   enable:
-#    - asciicheck
-#    - bidichk
-     - bodyclose
-#    - containedctx
-#    - contextcheck
-#    - decorder
-#    - depguard
-#    - dogsled
-#    - dupl
-     - durationcheck
-     - errcheck
-#    - errchkjson
-     - errname
-     - errorlint
-#    - execinquery
-#    - exhaustive
-#    - exhaustruct
-     - exportloopref
-#    - forbidigo
-#    - forcetypeassert
-#    - funlen
-     - gci
-#    - gochecknoglobals
-#    - gochecknoinits
-#    - gocognit
-#    - goconst
-     - gocritic
-#    - gocyclo
-#    - godot
-#    - godox
-#    - goerr113
-#    - gofmt
-#    - gofumpt
-#    - goheader
-#    - goimports
-#    - golint
-#    - gomnd
-#    - gomoddirectives
-#    - gomodguard
-#    - goprintffuncname
-     - gosec
-     - gosimple
-     - govet
-#    - grouper
-#    - importas
-     - ineffassign
-#    - interfacebloat
-#    - interfacer
-     - ireturn
-     - lll
-#    - maintidx
-#    - makezero
-#    - maligned
-     - misspell
-     - nakedret
-     - nestif
-     - nilerr
-#    - nilnil
-#    - nlreturn
-#    - noctx
-#    - nolintlint
-     - nonamedreturns
-#    - nosprintfhostport
-#    - paralleltest
-     - prealloc
-     - predeclared
-#    - promlinter
-#    - reassign
-     - revive
-#    - rowserrcheck
-#    - sqlclosecheck
-     - staticcheck
-     - stylecheck
-#    - tagliatelle
-#    - tenv
-#    - testpackage
-#    - thelper
-#    - tparallel
-     - typecheck
-     - unconvert
-#    - unparam
-#    - unused
-#    - usestdlibvars
-#    - varnamelen
-     - whitespace
-#    - wrapcheck
-#    - wsl
-
-linters-settings:
-  revive:
-    ignore-generated-header: true
-  lll:
-    line-length: 160
-  gci:
-    # Section configuration to compare against.
-    # Section names are case-insensitive and may contain parameters in ().
-    # The default order of sections is `standard > default > custom > blank > dot`,
-    # If `custom-order` is `true`, it follows the order of `sections` option.
-    # Default: ["standard", "default"]
-    sections:
-      - standard # Standard section: captures all standard packages.
-      - default # Default section: contains all imports that could not be matched to another section type.
-      - prefix(github.com/kiwicom/k8s-vault-operator) # Custom section: groups all imports with the specified Prefix.
-issues:
-  # See the dedicated "issues" documentation section.
-  option: value
-severity:
-  # See the dedicated "severity" documentation section.
-  option: value
+    - gci
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(github.com/kiwicom/k8s-vault-operator)
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
