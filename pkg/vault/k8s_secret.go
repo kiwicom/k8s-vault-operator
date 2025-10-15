@@ -78,60 +78,46 @@ func secretsAsFile(secrets Data, format string) (map[string][]byte, error) {
 	return output, nil
 }
 
-// buildVaultUIURL constructs a Vault UI URL from a vault path
-func buildVaultUIURL(uiBaseAddr, path string) string {
-	// Remove trailing slashes from base address
+// buildVaultUIURL constructs a Vault UI URL from a vault path and KV version
+func buildVaultUIURL(uiBaseAddr, path string, version int) string {
 	uiBaseAddr = strings.TrimSuffix(uiBaseAddr, "/")
+	path = strings.Trim(path, "/")
 
-	// Handle empty or invalid paths
 	if path == "" {
 		return uiBaseAddr
 	}
 
-	// Split path into components
-	parts := strings.Split(strings.Trim(path, "/"), "/")
-	if len(parts) == 0 {
-		return uiBaseAddr
+	// Extract mount (first path component) and remaining path
+	mount, remainingPath, _ := strings.Cut(path, "/")
+	isWildcard := strings.HasSuffix(path, "*")
+	remainingPath = strings.TrimSuffix(remainingPath, "*")
+	remainingPath = strings.Trim(remainingPath, "/")
+
+	// KV1: always use /show/
+	if version == 1 {
+		if remainingPath == "" {
+			return fmt.Sprintf("%s/vault/secrets/%s/show/", uiBaseAddr, mount)
+		}
+		return fmt.Sprintf("%s/vault/secrets/%s/show/%s", uiBaseAddr, mount, remainingPath)
 	}
 
-	// Extract mount point (first component)
-	mount := parts[0]
-
-	// Check if path ends with wildcard
-	isWildcard := strings.HasSuffix(path, "/*") || strings.HasSuffix(path, "*")
-
+	// KV2: use /kv/list/ for wildcards, /kv/ with URL-encoded path for specific secrets
 	if isWildcard {
-		// For wildcard paths, use list view
-		// Remove the wildcard from parts
-		pathWithoutWildcard := strings.TrimSuffix(strings.TrimSuffix(path, "*"), "/")
-		remainingPath := strings.TrimPrefix(pathWithoutWildcard, mount+"/")
-		remainingPath = strings.TrimPrefix(remainingPath, mount)
-		remainingPath = strings.Trim(remainingPath, "/")
-
 		if remainingPath == "" {
 			return fmt.Sprintf("%s/vault/secrets/%s/kv/list/", uiBaseAddr, mount)
 		}
 		return fmt.Sprintf("%s/vault/secrets/%s/kv/list/%s/", uiBaseAddr, mount, remainingPath)
 	}
 
-	// For specific paths, use show view with URL-encoded path
-	remainingPath := strings.TrimPrefix(path, mount+"/")
-	remainingPath = strings.TrimPrefix(remainingPath, mount)
-	remainingPath = strings.Trim(remainingPath, "/")
-
+	// KV2 specific path: encode slashes as %2F
 	if remainingPath == "" {
 		return fmt.Sprintf("%s/vault/secrets/%s/kv/", uiBaseAddr, mount)
 	}
-
-	// URL encode the remaining path (slashes become %2F)
-	encodedPath := url.PathEscape(remainingPath)
-	// PathEscape doesn't encode slashes, so we need to do it manually
-	encodedPath = strings.ReplaceAll(encodedPath, "/", "%2F")
-
+	encodedPath := strings.ReplaceAll(url.PathEscape(remainingPath), "/", "%2F")
 	return fmt.Sprintf("%s/vault/secrets/%s/kv/%s", uiBaseAddr, mount, encodedPath)
 }
 
-func NewSecret(ctx context.Context, vaultSecret *v1.VaultSecret, data Data, uiBaseAddr string) (*corev1.Secret, error) {
+func NewSecret(ctx context.Context, vaultSecret *v1.VaultSecret, data Data, uiBaseAddr string, pathVersions map[string]int) (*corev1.Secret, error) {
 	var (
 		err      error
 		contents map[string][]byte
@@ -172,7 +158,14 @@ func NewSecret(ctx context.Context, vaultSecret *v1.VaultSecret, data Data, uiBa
 	if uiBaseAddr != "" && len(vaultSecret.Spec.Paths) > 0 {
 		var urls []string
 		for _, pathSpec := range vaultSecret.Spec.Paths {
-			url := buildVaultUIURL(uiBaseAddr, pathSpec.Path)
+			// Determine version for this path (remove trailing /* for lookup)
+			lookupPath := strings.TrimSuffix(strings.TrimSuffix(pathSpec.Path, "*"), "/")
+			version := pathVersions[lookupPath]
+			if version == 0 {
+				// Fallback to KV2 if version not found
+				version = 2
+			}
+			url := buildVaultUIURL(uiBaseAddr, pathSpec.Path, version)
 			urls = append(urls, url)
 		}
 		annotations["k8s-vault-operator/vault-ui-urls"] = strings.Join(urls, ", ")

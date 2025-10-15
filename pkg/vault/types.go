@@ -23,6 +23,7 @@ type PathData struct {
 	BasePath string             `json:"base_path"`
 	Prefix   string             `json:"prefix"`
 	Paths    map[string]Secrets `json:"paths"`
+	Versions map[string]int     `json:"versions"` // KV version (1 or 2) for each path
 }
 
 func (pd *PathData) GetRelativePath(path string) string {

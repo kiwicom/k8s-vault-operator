@@ -58,6 +58,20 @@ func (r *Reader) GetData() Data {
 	return r.data
 }
 
+// GetPathVersions returns a map of base path to KV version
+// For wildcard paths, it returns the version of the first resolved path (all should be same mount/version)
+func (r *Reader) GetPathVersions() map[string]int {
+	versions := make(map[string]int)
+	for _, pathData := range r.paths {
+		// Pick the first version from this PathData (all should be same mount/version)
+		for _, version := range pathData.Versions {
+			versions[pathData.BasePath] = version
+			break
+		}
+	}
+	return versions
+}
+
 func (r *Reader) ReadData(ctx context.Context) error {
 	if err := r.getAbsolutePaths(ctx); err != nil {
 		return fmt.Errorf("failed to get paths from vault: %w", err)
@@ -142,6 +156,7 @@ func (r *Reader) getAbsolutePaths(ctx context.Context) error {
 			BasePath: cleanedPath,
 			Prefix:   path.Prefix,
 			Paths:    paths,
+			Versions: make(map[string]int), // Initialize versions map
 		})
 	}
 
@@ -170,12 +185,13 @@ func (r *Reader) readSecretsFromPaths(ctx context.Context) error {
 
 	wg, gCtx := errgroup.WithContext(ctx)
 	wg.SetLimit(20)
-	for _, pathData := range r.paths {
+	for i := range r.paths {
+		pathData := &r.paths[i] // Get pointer to modify in place
 		for absolutePath, secrets := range pathData.Paths {
 			absolutePath := absolutePath
 			secrets := secrets
 			wg.Go(func() error {
-				secretsData, err := pathReader.Read(gCtx, absolutePath)
+				secretsData, version, err := pathReader.Read(gCtx, absolutePath)
 				if err != nil {
 					if errors.Is(err, ErrNotFound) {
 						// make a log entry and skip the broken path
@@ -187,6 +203,8 @@ func (r *Reader) readSecretsFromPaths(ctx context.Context) error {
 					}
 					return err
 				}
+				// Store the version for this path
+				pathData.Versions[absolutePath] = version
 				for k, v := range secretsData {
 					_, ok := secrets[k]
 					if ok {

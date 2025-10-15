@@ -160,7 +160,10 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		uiBaseAddr = strings.TrimSuffix(vaultSecret.Spec.Addr, "/") + "/ui"
 	}
 
-	k8sSecret, err := vault.NewSecret(ctx, &vaultSecret, reader.GetData(), uiBaseAddr)
+	// Get path versions (KV1 vs KV2) for URL generation
+	pathVersions := reader.GetPathVersions()
+
+	k8sSecret, err := vault.NewSecret(ctx, &vaultSecret, reader.GetData(), uiBaseAddr, pathVersions)
 	if err != nil {
 		logger.Info(fmt.Sprintf("VaultOperator sync rejected: %v", err))
 		r.EventRecorder.Warning(&vaultSecret, "sync rejected", err)
