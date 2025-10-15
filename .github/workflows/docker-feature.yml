@@ -33,5 +33,4 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: |
-            kiwicom/k8s-vault-operator:${{ github.event.workflow_run.head_branch }}
-
+            kiwicom/k8s-vault-operator:${{ github.event.workflow_run.head_sha }}
