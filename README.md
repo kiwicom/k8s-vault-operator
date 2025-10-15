@@ -83,6 +83,7 @@ Available configuration options:
 - `OPERATOR_NAME`: a unique name for the operator - when running inside a cluster, it also serves as the name of the lock
 - `LOG_LEVEL` (default `INFO`): specifies the ammount of logging output (values can be `INFO`, `DEBUG`)
 - `VAULT_ADDR` (default `http://127.0.0.1:8200`): Vault address.
+- `VAULT_UI_ADDR` (optional): Vault UI base URL for generating annotation links. If not set, automatically derived from `VAULT_ADDR` by appending `/ui`. Example: `https://vault.example.com/ui`
 - `DEFAULT_SA_AUTH_PATH` (no default): this value has to be assigned per cluster, and it specifies the default Vault path used for SA/JWT authentication
     - by default, it should follow this convention: `auth/k8s/<cluster>/login`
 - `DEFAULT_RECONCILE_PERIOD` (default `10m`): default reconcile period (i.e. how often will Vault secrets be synced)
@@ -448,6 +449,29 @@ You can use:
 `spec.reconcilePeriod` defines how often the operator will attempt to sync secrets. Default value is set to 10 minutes, which should be good for most cases.
 
 **Note**: a fast reconcile period, along with a complex path structure, can cause a lot of requests to Vault. Keep this in mind when specifying this value.
+
+### Vault UI URL Annotations
+
+The operator automatically adds annotations to synced Kubernetes secrets with links to the Vault UI, making it easy to navigate to the source secrets for rotation or management.
+
+**Annotation added:**
+- `k8s-vault-operator/vault-ui-urls`: Comma-separated list of Vault UI URLs corresponding to each path in the VaultSecret
+
+**Example:**
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-app-secrets
+  annotations:
+    k8s-vault-operator/vault-ui-urls: "https://vault.example.com/ui/vault/secrets/teams/kv/platform%2Finfra%2Fapp, https://vault.example.com/ui/vault/secrets/secret/kv/list/myapp/"
+```
+
+The URLs are automatically formatted based on the path type:
+- **Wildcard paths** (ending with `/*`): Link to list view in Vault UI
+- **Specific paths**: Link to show view with URL-encoded path
+
+Configure the Vault UI base URL using the `VAULT_UI_ADDR` environment variable (see [Configuration](#operator-configuration)).
 
 ### Adding VaultSecrets to Kustomize
 

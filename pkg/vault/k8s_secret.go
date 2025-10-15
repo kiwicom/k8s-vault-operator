@@ -5,6 +5,7 @@ import (
 	//nolint:gosec
 	"crypto/sha1"
 	"fmt"
+	"net/url"
 	"strings"
 	"unicode"
 
@@ -77,7 +78,60 @@ func secretsAsFile(secrets Data, format string) (map[string][]byte, error) {
 	return output, nil
 }
 
-func NewSecret(ctx context.Context, vaultSecret *v1.VaultSecret, data Data) (*corev1.Secret, error) {
+// buildVaultUIURL constructs a Vault UI URL from a vault path
+func buildVaultUIURL(uiBaseAddr, path string) string {
+	// Remove trailing slashes from base address
+	uiBaseAddr = strings.TrimSuffix(uiBaseAddr, "/")
+
+	// Handle empty or invalid paths
+	if path == "" {
+		return uiBaseAddr
+	}
+
+	// Split path into components
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	if len(parts) == 0 {
+		return uiBaseAddr
+	}
+
+	// Extract mount point (first component)
+	mount := parts[0]
+
+	// Check if path ends with wildcard
+	isWildcard := strings.HasSuffix(path, "/*") || strings.HasSuffix(path, "*")
+
+	if isWildcard {
+		// For wildcard paths, use list view
+		// Remove the wildcard from parts
+		pathWithoutWildcard := strings.TrimSuffix(strings.TrimSuffix(path, "*"), "/")
+		remainingPath := strings.TrimPrefix(pathWithoutWildcard, mount+"/")
+		remainingPath = strings.TrimPrefix(remainingPath, mount)
+		remainingPath = strings.Trim(remainingPath, "/")
+
+		if remainingPath == "" {
+			return fmt.Sprintf("%s/vault/secrets/%s/kv/list/", uiBaseAddr, mount)
+		}
+		return fmt.Sprintf("%s/vault/secrets/%s/kv/list/%s/", uiBaseAddr, mount, remainingPath)
+	}
+
+	// For specific paths, use show view with URL-encoded path
+	remainingPath := strings.TrimPrefix(path, mount+"/")
+	remainingPath = strings.TrimPrefix(remainingPath, mount)
+	remainingPath = strings.Trim(remainingPath, "/")
+
+	if remainingPath == "" {
+		return fmt.Sprintf("%s/vault/secrets/%s/kv/", uiBaseAddr, mount)
+	}
+
+	// URL encode the remaining path (slashes become %2F)
+	encodedPath := url.PathEscape(remainingPath)
+	// PathEscape doesn't encode slashes, so we need to do it manually
+	encodedPath = strings.ReplaceAll(encodedPath, "/", "%2F")
+
+	return fmt.Sprintf("%s/vault/secrets/%s/kv/%s", uiBaseAddr, mount, encodedPath)
+}
+
+func NewSecret(ctx context.Context, vaultSecret *v1.VaultSecret, data Data, uiBaseAddr string) (*corev1.Secret, error) {
 	var (
 		err      error
 		contents map[string][]byte
@@ -111,11 +165,25 @@ func NewSecret(ctx context.Context, vaultSecret *v1.VaultSecret, data Data) (*co
 		"managed-by": ManagedByLabel,
 	}
 
+	// Build annotations with Vault UI URLs
+	annotations := make(map[string]string)
+
+	// Build comma-separated list of UI URLs for all paths
+	if uiBaseAddr != "" && len(vaultSecret.Spec.Paths) > 0 {
+		var urls []string
+		for _, pathSpec := range vaultSecret.Spec.Paths {
+			url := buildVaultUIURL(uiBaseAddr, pathSpec.Path)
+			urls = append(urls, url)
+		}
+		annotations["k8s-vault-operator/vault-ui-urls"] = strings.Join(urls, ", ")
+	}
+
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      vaultSecret.Spec.TargetSecretName,
-			Namespace: vaultSecret.Namespace,
-			Labels:    labels,
+			Name:        vaultSecret.Spec.TargetSecretName,
+			Namespace:   vaultSecret.Namespace,
+			Labels:      labels,
+			Annotations: annotations,
 		},
 		Type: corev1.SecretTypeOpaque,
 		Data: contents,

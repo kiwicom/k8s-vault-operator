@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 
@@ -153,7 +154,13 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, err
 	}
 
-	k8sSecret, err := vault.NewSecret(ctx, &vaultSecret, reader.GetData())
+	// Determine UI base URL: prefer config value, fallback to deriving from vaultSecret.Spec.Addr
+	uiBaseAddr := r.VaultConfig.VaultUIAddr
+	if uiBaseAddr == "" && vaultSecret.Spec.Addr != "" {
+		uiBaseAddr = strings.TrimSuffix(vaultSecret.Spec.Addr, "/") + "/ui"
+	}
+
+	k8sSecret, err := vault.NewSecret(ctx, &vaultSecret, reader.GetData(), uiBaseAddr)
 	if err != nil {
 		logger.Info(fmt.Sprintf("VaultOperator sync rejected: %v", err))
 		r.EventRecorder.Warning(&vaultSecret, "sync rejected", err)
@@ -185,10 +192,19 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		}
 	}
 
-	// Secret already exists
-	eq := reflect.DeepEqual(k8sSecret.Data, found.Data)
+	// Secret already exists - preserve existing annotations we don't manage
+	if found.Annotations != nil {
+		for key, value := range found.Annotations {
+			if _, exists := k8sSecret.Annotations[key]; !exists {
+				k8sSecret.Annotations[key] = value
+			}
+		}
+	}
+
+	// Check if update is needed
+	eq := reflect.DeepEqual(k8sSecret.Data, found.Data) && reflect.DeepEqual(k8sSecret.Annotations, found.Annotations)
 	if !eq {
-		logger.Info("Secret exists, data not equal, updating: " + k8sSecret.Namespace + " Secret.name: " + k8sSecret.Name)
+		logger.Info("Secret exists, updating: " + k8sSecret.Namespace + " Secret.name: " + k8sSecret.Name)
 
 		err = r.Client.Update(ctx, k8sSecret)
 		if err != nil {

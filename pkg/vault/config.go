@@ -24,6 +24,7 @@ type AppConfig struct {
 	OperatorRole            string        `koanf:"operator_role"`
 	Role                    string        `koanf:"role"`
 	DefaultVaultAddr        string        `koanf:"vault_addr"`
+	VaultUIAddr             string        `koanf:"vault_ui_addr"`
 	MaxConcurrentReconciles int           `koanf:"max_concurrent_reconciles"`
 	RefreshTokenBefore      time.Duration `koanf:"refresh_token_before"`
 }
@@ -51,6 +52,11 @@ func NewAppConfig() (AppConfig, error) {
 
 	if err := k.Unmarshal("", &cfg); err != nil {
 		return cfg, fmt.Errorf("unmarshal: %w", err)
+	}
+
+	// If VaultUIAddr is not set, derive it from DefaultVaultAddr
+	if cfg.VaultUIAddr == "" && cfg.DefaultVaultAddr != "" {
+		cfg.VaultUIAddr = strings.TrimSuffix(cfg.DefaultVaultAddr, "/") + "/ui"
 	}
 
 	return cfg, nil
