@@ -5,6 +5,7 @@ import (
 	//nolint:gosec
 	"crypto/sha1"
 	"fmt"
+	"net/url"
 	"strings"
 	"unicode"
 
@@ -77,7 +78,46 @@ func secretsAsFile(secrets Data, format string) (map[string][]byte, error) {
 	return output, nil
 }
 
-func NewSecret(ctx context.Context, vaultSecret *v1.VaultSecret, data Data) (*corev1.Secret, error) {
+// buildVaultUIURL constructs a Vault UI URL from a vault path and KV version
+func buildVaultUIURL(uiBaseAddr, path string, version int) string {
+	uiBaseAddr = strings.TrimSuffix(uiBaseAddr, "/")
+	path = strings.Trim(path, "/")
+
+	if path == "" {
+		return uiBaseAddr
+	}
+
+	// Extract mount (first path component) and remaining path
+	mount, remainingPath, _ := strings.Cut(path, "/")
+	isWildcard := strings.HasSuffix(path, "*")
+	remainingPath = strings.TrimSuffix(remainingPath, "*")
+	remainingPath = strings.Trim(remainingPath, "/")
+
+	// KV1: always use /show/
+	if version == 1 {
+		if remainingPath == "" {
+			return fmt.Sprintf("%s/vault/secrets/%s/show/", uiBaseAddr, mount)
+		}
+		return fmt.Sprintf("%s/vault/secrets/%s/show/%s", uiBaseAddr, mount, remainingPath)
+	}
+
+	// KV2: use /kv/list/ for wildcards, /kv/ with URL-encoded path for specific secrets
+	if isWildcard {
+		if remainingPath == "" {
+			return fmt.Sprintf("%s/vault/secrets/%s/kv/list/", uiBaseAddr, mount)
+		}
+		return fmt.Sprintf("%s/vault/secrets/%s/kv/list/%s/", uiBaseAddr, mount, remainingPath)
+	}
+
+	// KV2 specific path: encode slashes as %2F
+	if remainingPath == "" {
+		return fmt.Sprintf("%s/vault/secrets/%s/kv/", uiBaseAddr, mount)
+	}
+	encodedPath := strings.ReplaceAll(url.PathEscape(remainingPath), "/", "%2F")
+	return fmt.Sprintf("%s/vault/secrets/%s/kv/%s", uiBaseAddr, mount, encodedPath)
+}
+
+func NewSecret(ctx context.Context, vaultSecret *v1.VaultSecret, data Data, uiBaseAddr string, pathVersions map[string]int) (*corev1.Secret, error) {
 	var (
 		err      error
 		contents map[string][]byte
@@ -111,11 +151,32 @@ func NewSecret(ctx context.Context, vaultSecret *v1.VaultSecret, data Data) (*co
 		"managed-by": ManagedByLabel,
 	}
 
+	// Build annotations with Vault UI URLs
+	annotations := make(map[string]string)
+
+	// Build comma-separated list of UI URLs for all paths
+	if uiBaseAddr != "" && len(vaultSecret.Spec.Paths) > 0 {
+		var urls []string
+		for _, pathSpec := range vaultSecret.Spec.Paths {
+			// Determine version for this path (remove trailing /* for lookup)
+			lookupPath := strings.TrimSuffix(strings.TrimSuffix(pathSpec.Path, "*"), "/")
+			version := pathVersions[lookupPath]
+			if version == 0 {
+				// Fallback to KV2 if version not found
+				version = 2
+			}
+			url := buildVaultUIURL(uiBaseAddr, pathSpec.Path, version)
+			urls = append(urls, url)
+		}
+		annotations["k8s-vault-operator/vault-ui-urls"] = strings.Join(urls, ", ")
+	}
+
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      vaultSecret.Spec.TargetSecretName,
-			Namespace: vaultSecret.Namespace,
-			Labels:    labels,
+			Name:        vaultSecret.Spec.TargetSecretName,
+			Namespace:   vaultSecret.Namespace,
+			Labels:      labels,
+			Annotations: annotations,
 		},
 		Type: corev1.SecretTypeOpaque,
 		Data: contents,
