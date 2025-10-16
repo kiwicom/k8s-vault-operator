@@ -185,6 +185,7 @@ func (r *Reader) readSecretsFromPaths(ctx context.Context) error {
 
 	wg, gCtx := errgroup.WithContext(ctx)
 	wg.SetLimit(20)
+	var mx sync.Mutex
 	for i := range r.paths {
 		pathData := &r.paths[i] // Get pointer to modify in place
 		for absolutePath, secrets := range pathData.Paths {
@@ -203,7 +204,8 @@ func (r *Reader) readSecretsFromPaths(ctx context.Context) error {
 					}
 					return err
 				}
-				// Store the version for this path
+				// Protect concurrent map writes
+				mx.Lock()
 				pathData.Versions[absolutePath] = version
 				for k, v := range secretsData {
 					_, ok := secrets[k]
@@ -212,6 +214,7 @@ func (r *Reader) readSecretsFromPaths(ctx context.Context) error {
 					}
 					secrets[k] = v
 				}
+				mx.Unlock()
 				return nil
 			})
 		}
