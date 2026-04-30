@@ -22,7 +22,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.x"
+          go-version: "1.24"
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v7
@@ -47,6 +47,7 @@ jobs:
           VAULT_DEV_ROOT_TOKEN_ID: testtoken
           VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
           VAULT_LOG_LEVEL: trace
+          SKIP_SETCAP: "true"
 
     steps:
       - id: go-cache-paths
@@ -60,7 +61,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.x"
+          go-version: "1.24"
 
       - name: Go Build Cache
         uses: actions/cache@v4
@@ -73,6 +74,30 @@ jobs:
         with:
           path: ${{ steps.go-cache-paths.outputs.go-mod }}
           key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
+
+      - name: Diagnose Vault service container
+        run: |
+          echo "--- docker ps -a ---"
+          docker ps -a || true
+          for cid in $(docker ps -a -q); do
+            name=$(docker inspect --format '{{.Name}} {{.Config.Image}}' "$cid")
+            echo "--- docker logs $cid ($name) ---"
+            docker logs "$cid" 2>&1 | tail -50 || true
+          done
+          echo "--- curl health ---"
+          curl -v http://127.0.0.1:8200/v1/sys/health || true
+
+      - name: Wait for Vault to be ready
+        run: |
+          for i in {1..60}; do
+            if curl -fsS http://127.0.0.1:8200/v1/sys/health >/dev/null 2>&1; then
+              echo "vault is ready after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "vault did not become ready in time" >&2
+          exit 1
 
       - name: Run tests
         run: make test
