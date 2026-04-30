@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"reflect"
 	"strings"
 	"sync"
@@ -289,6 +290,10 @@ func (r *VaultSecretReconciler) validateResource(vaultSecret *k8skiwicomv1.Vault
 		vaultSecret.Spec.Addr = r.VaultConfig.DefaultVaultAddr
 	}
 
+	if err = validateVaultAddr(vaultSecret.Spec.Addr, r.VaultConfig.AllowedVaultAddrs, r.VaultConfig.DefaultVaultAddr); err != nil {
+		return err
+	}
+
 	if vaultSecret.Spec.Auth.Token != "" {
 		return nil
 	}
@@ -329,6 +334,34 @@ func updateVaultSecretResource(ctx context.Context, c client.Client, secret *k8s
 	err := c.Status().Update(ctx, secret)
 	if err != nil {
 		return fmt.Errorf("failed to update resource status: %w", err)
+	}
+
+	return nil
+}
+
+func validateVaultAddr(addr string, allowedAddrsStr string, defaultAddr string) error {
+	if addr == defaultAddr {
+		return nil
+	}
+
+	u, err := url.Parse(addr)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return errors.New("invalid or empty vault address")
+	}
+
+	if allowedAddrsStr != "" {
+		allowed := false
+		for _, a := range strings.Split(allowedAddrsStr, ",") {
+			if strings.TrimSpace(a) == addr {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			return fmt.Errorf("vault address %q is not in the allowlist", addr)
+		}
+	} else {
+		return errors.New("custom vault addresses are not permitted (allowlist is empty)")
 	}
 
 	return nil

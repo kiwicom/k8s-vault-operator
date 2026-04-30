@@ -114,6 +114,7 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).ToNot(HaveOccurred())
 
+	Expect(os.Setenv("ALLOWED_VAULT_ADDRS", "http://localhost:8200")).To(Succeed())
 	appConfig, err := vault.NewAppConfig()
 	Expect(err).ToNot(HaveOccurred())
 
