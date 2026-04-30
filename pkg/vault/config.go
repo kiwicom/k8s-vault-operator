@@ -24,6 +24,7 @@ type AppConfig struct {
 	OperatorRole            string        `koanf:"operator_role"`
 	Role                    string        `koanf:"role"`
 	DefaultVaultAddr        string        `koanf:"vault_addr"`
+	AllowedVaultAddrs       string        `koanf:"allowed_vault_addrs"`
 	VaultUIAddr             string        `koanf:"vault_ui_addr"`
 	MaxConcurrentReconciles int           `koanf:"max_concurrent_reconciles"`
 	RefreshTokenBefore      time.Duration `koanf:"refresh_token_before"`
