@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand/v2"
 	"net/url"
 	"reflect"
 	"strings"
@@ -221,7 +222,7 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, err
 	}
 
-	return ctrl.Result{RequeueAfter: reconcileAfter}, nil
+	return ctrl.Result{RequeueAfter: withJitter(reconcileAfter)}, nil
 }
 
 func (r *VaultSecretReconciler) cachedSA(id string) *vault.AuthServiceAccount {
@@ -337,6 +338,14 @@ func updateVaultSecretResource(ctx context.Context, c client.Client, secret *k8s
 	}
 
 	return nil
+}
+
+// withJitter adds up to 10% random jitter to d to spread reconcile load.
+func withJitter(d time.Duration) time.Duration {
+	if d <= 0 {
+		return d
+	}
+	return d + time.Duration(rand.N(int64(d/10)))
 }
 
 func validateVaultAddr(addr string, allowedAddrsStr string, defaultAddr string) error {
