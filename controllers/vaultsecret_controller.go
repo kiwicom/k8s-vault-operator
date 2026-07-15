@@ -18,6 +18,8 @@ package controllers
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/rand/v2"
@@ -231,9 +233,27 @@ func (r *VaultSecretReconciler) cachedSA(id string) *vault.AuthServiceAccount {
 	return r.authSACache[id]
 }
 
+// authSACacheKey builds an injective cache key from the fields that identify an
+// AuthServiceAccount. A plain "-"-joined string is NOT injective: "-" is legal in
+// namespace names, ServiceAccount names, roles, and auth paths, so distinct tuples
+// such as (ns="team-a", sa="svc") and (ns="team", sa="a-svc") collapse to the same
+// key. That collision lets one tenant's reconcile ride on another tenant's cached
+// identity and mint a Kubernetes SA-JWT for it, disclosing the other tenant's Vault
+// secrets. We hash the length-prefixed fields so the encoding is unambiguous
+// regardless of which characters the individual fields contain.
+func authSACacheKey(addr, namespace, saName, role, authPath string) string {
+	h := sha256.New()
+	for _, field := range []string{addr, namespace, saName, role, authPath} {
+		// Length prefix makes the concatenation injective: no field value can
+		// spill across the boundary into the next field.
+		_, _ = fmt.Fprintf(h, "%d:%s", len(field), field)
+	}
+	return hex.EncodeToString(h.Sum(nil))
+}
+
 func (r *VaultSecretReconciler) getAuthServiceAccount(vaultSecret k8skiwicomv1.VaultSecret) (*vault.AuthServiceAccount, error) {
 	saRef := vaultSecret.Spec.Auth.ServiceAccountRef
-	id := fmt.Sprintf("%s-%s-%s-%s-%s", vaultSecret.Spec.Addr, vaultSecret.Namespace, saRef.Name, saRef.Role, saRef.AuthPath)
+	id := authSACacheKey(vaultSecret.Spec.Addr, vaultSecret.Namespace, saRef.Name, saRef.Role, saRef.AuthPath)
 	saAccount := r.cachedSA(id)
 	if saAccount != nil {
 		return saAccount, nil
@@ -345,7 +365,9 @@ func withJitter(d time.Duration) time.Duration {
 	if d <= 0 {
 		return d
 	}
-	return d + time.Duration(rand.N(int64(d/10)))
+	// Jitter only spreads reconcile load across time; it is not security-sensitive,
+	// so a non-cryptographic RNG is fine.
+	return d + time.Duration(rand.N(int64(d/10))) //nolint:gosec // G404: weak RNG acceptable for load jitter
 }
 
 func validateVaultAddr(addr string, allowedAddrsStr string, defaultAddr string) error {

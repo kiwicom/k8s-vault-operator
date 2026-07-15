@@ -80,3 +80,44 @@ func TestValidateVaultAddr(t *testing.T) {
 		})
 	}
 }
+
+// TestAuthSACacheKeyInjective guards against the cross-tenant secret disclosure
+// caused by a non-injective cache key. Two tenants whose ("-"-joined) tuples
+// collapse to the same string must still receive distinct cache keys, otherwise
+// one tenant's reconcile can ride on the other's cached identity.
+func TestAuthSACacheKeyInjective(t *testing.T) {
+	const addr = "http://vault.vault.svc.cluster.local:8200"
+	const role = "reader-prod"
+	const authPath = "auth/kubernetes/login"
+
+	// (namespace="team-a", saName="svc") vs (namespace="team", saName="a-svc")
+	// both "-"-join to "...-team-a-svc-...".
+	keyA := authSACacheKey(addr, "team-a", "svc", role, authPath)
+	keyB := authSACacheKey(addr, "team", "a-svc", role, authPath)
+
+	if keyA == keyB {
+		t.Fatalf("cache key collision between distinct tenants: %q == %q", keyA, keyB)
+	}
+
+	// Same tuple must be stable (so caching actually works).
+	if got := authSACacheKey(addr, "team-a", "svc", role, authPath); got != keyA {
+		t.Fatalf("cache key not stable for identical input: %q != %q", got, keyA)
+	}
+
+	// A field boundary shift in any position must change the key.
+	tuples := [][5]string{
+		{addr, "ns", "sa", "role", "path"},
+		{addr, "n", "ssa", "role", "path"},
+		{addr, "ns", "sa", "rol", "epath"},
+		{"http://a", "b", "sa", "role", "path"},
+		{"http://ab", "", "sa", "role", "path"},
+	}
+	seen := map[string][5]string{}
+	for _, tp := range tuples {
+		k := authSACacheKey(tp[0], tp[1], tp[2], tp[3], tp[4])
+		if prev, ok := seen[k]; ok {
+			t.Fatalf("cache key collision: %v and %v both map to %q", prev, tp, k)
+		}
+		seen[k] = tp
+	}
+}
