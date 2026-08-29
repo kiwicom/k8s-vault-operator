@@ -315,6 +315,17 @@ func (r *VaultSecretReconciler) validateResource(vaultSecret *k8skiwicomv1.Vault
 		return err
 	}
 
+	// Validate Vault paths to prevent API path injection and traversal attacks.
+	// User-controlled path values from the CRD flow directly into Vault HTTP API
+	// requests via string concatenation. Without validation, a path like
+	// "sys/raw/config" could cause the operator to read arbitrary Vault endpoints,
+	// and "../" traversal could escape the /v1/ prefix behind path-normalizing proxies.
+	for i, p := range vaultSecret.Spec.Paths {
+		if err := validateVaultPath(p.Path); err != nil {
+			return fmt.Errorf("VaultSecret.Spec.Paths[%d].path is invalid: %w", i, err)
+		}
+	}
+
 	if vaultSecret.Spec.Auth.Token != "" {
 		return nil
 	}
@@ -344,6 +355,33 @@ func (r *VaultSecretReconciler) validateResource(vaultSecret *k8skiwicomv1.Vault
 		} else {
 			vaultSecret.Spec.Auth.ServiceAccountRef.Role = req.Namespace
 		}
+	}
+
+	return nil
+}
+
+// validateVaultPath validates a user-controlled Vault path to prevent API path
+// injection and directory traversal. Paths that start with "sys/" or "auth/"
+// could access sensitive Vault endpoints (e.g. sys/raw/config reads raw storage).
+// "../" traversal can escape the /v1/ prefix when behind path-normalizing proxies.
+func validateVaultPath(p string) error {
+	if p == "" {
+		return errors.New("path must not be empty")
+	}
+
+	if strings.Contains(p, "../") {
+		return fmt.Errorf("path %q contains directory traversal sequence", p)
+	}
+
+	// Normalize: strip leading slash for prefix checks
+	normalized := strings.TrimPrefix(p, "/")
+
+	if strings.HasPrefix(normalized, "sys/") || normalized == "sys" {
+		return fmt.Errorf("path %q targets restricted Vault sys/ endpoints", p)
+	}
+
+	if strings.HasPrefix(normalized, "auth/") || normalized == "auth" {
+		return fmt.Errorf("path %q targets restricted Vault auth/ endpoints", p)
 	}
 
 	return nil
