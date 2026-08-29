@@ -338,12 +338,50 @@ func (r *VaultSecretReconciler) validateResource(vaultSecret *k8skiwicomv1.Vault
 		vaultSecret.Spec.Auth.ServiceAccountRef.AuthPath = r.VaultConfig.DefaultSAAuthPath
 	}
 
+	// Validate authPath to prevent Vault API write path injection. The authPath
+	// flows directly into vaultApi.Logical().Write() without validation. Without
+	// checks, setting authPath to "sys/raw/config" would write the Kubernetes SA
+	// JWT to an arbitrary endpoint, or redirect auth to permissive mounts for
+	// privilege escalation.
+	if err := validateAuthPath(vaultSecret.Spec.Auth.ServiceAccountRef.AuthPath); err != nil {
+		return fmt.Errorf("VaultSecret.Spec.Auth.ServiceAccountRef.AuthPath is invalid: %w", err)
+	}
+
 	if vaultSecret.Spec.Auth.ServiceAccountRef.Role == "" {
 		if r.VaultConfig.Role != "" {
 			vaultSecret.Spec.Auth.ServiceAccountRef.Role = r.VaultConfig.Role
 		} else {
 			vaultSecret.Spec.Auth.ServiceAccountRef.Role = req.Namespace
 		}
+	}
+
+	return nil
+}
+
+// validateAuthPath validates the Vault auth path used in JWT auth login requests.
+// The authPath flows directly into vaultApi.Logical().Write() so it must be
+// constrained to legitimate auth mount login endpoints. Without validation,
+// setting authPath to "sys/raw/config" would write the Kubernetes SA JWT to an
+// arbitrary endpoint, and redirecting to permissive auth mounts enables
+// privilege escalation.
+func validateAuthPath(authPath string) error {
+	if authPath == "" {
+		return errors.New("authPath must not be empty")
+	}
+
+	if strings.Contains(authPath, "../") {
+		return fmt.Errorf("authPath %q contains directory traversal sequence", authPath)
+	}
+
+	// Normalize: strip leading slash for prefix checks
+	normalized := strings.TrimPrefix(authPath, "/")
+
+	if !strings.HasPrefix(normalized, "auth/") {
+		return fmt.Errorf("authPath %q must start with auth/", authPath)
+	}
+
+	if !strings.HasSuffix(normalized, "/login") {
+		return fmt.Errorf("authPath %q must end with /login", authPath)
 	}
 
 	return nil
